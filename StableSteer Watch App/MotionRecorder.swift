@@ -1,6 +1,7 @@
 import Foundation
 import CoreMotion
 import Combine
+import WatchKit
 
 /// Wraps CMMotionManager and turns device-motion updates into MotionSamples.
 /// Runs entirely on the Watch — no phone connection required to record.
@@ -12,9 +13,16 @@ final class MotionRecorder: ObservableObject {
     @Published var elapsedTime: TimeInterval = 0
     @Published var sampleCount = 0
 
+    @Published var isCalibrating = false
+    @Published var calibrationProgress: Double = 0 // 0...1, for a progress bar
+
     private var samples: [MotionSample] = []
     private var startTimestamp: TimeInterval = 0
-    let sampleRateHz: Double = 50.0
+    let sampleRateHz: Double = 100.0
+
+    /// Radians subtracted from every raw pitch reading so the calibrated neutral position reads as 0°. Set by calibrate().
+    private(set) var calibrationOffset: Double = 0
+    private let calibrationDuration: TimeInterval = 15.0 // well under the 60s ceiling
 
     func start() {
         guard motionManager.isDeviceMotionAvailable else {
@@ -40,7 +48,7 @@ final class MotionRecorder: ObservableObject {
             let elapsed = motion.timestamp - self.startTimestamp
             let sample = MotionSample(
                 elapsedTime: elapsed,
-                attitudeX: motion.attitude.pitch
+                attitudeX: motion.attitude.pitch - self.calibrationOffset
             )
             self.samples.append(sample)
 
@@ -63,5 +71,51 @@ final class MotionRecorder: ObservableObject {
             samples: samples
         )
         return session
+    }
+
+    /// Clears the finished session's stopwatch/sample count so the watch
+    /// screen is ready for a fresh Start. Does not touch calibrationOffset.
+    func reset() {
+        guard !isRecording, !isCalibrating else { return }
+        samples.removeAll()
+        sampleCount = 0
+        elapsedTime = 0
+        startTimestamp = 0
+    }
+
+    /// Averages raw pitch over `calibrationDuration` seconds and stores the
+    /// result as the new zero point. Ask the user to hold their hands at the
+    /// wheel's neutral position while this runs. Buzzes the watch on completion.
+    func calibrate() {
+        guard motionManager.isDeviceMotionAvailable, !isRecording, !isCalibrating else { return }
+        isCalibrating = true
+        calibrationProgress = 0
+
+        var pitchSamples: [Double] = []
+        let calibrationStart = Date()
+
+        motionManager.deviceMotionUpdateInterval = 1.0 / sampleRateHz
+        queue.qualityOfService = .userInitiated
+
+        motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: queue) { [weak self] motion, error in
+            guard let self, let motion else { return }
+            pitchSamples.append(motion.attitude.pitch)
+
+            let elapsed = Date().timeIntervalSince(calibrationStart)
+            DispatchQueue.main.async {
+                self.calibrationProgress = min(elapsed / self.calibrationDuration, 1.0)
+            }
+
+            guard elapsed >= self.calibrationDuration else { return }
+
+            self.motionManager.stopDeviceMotionUpdates()
+            let average = pitchSamples.reduce(0, +) / Double(pitchSamples.count)
+
+            DispatchQueue.main.async {
+                self.calibrationOffset = average
+                self.isCalibrating = false
+                WKInterfaceDevice.current().play(.success)
+            }
+        }
     }
 }
