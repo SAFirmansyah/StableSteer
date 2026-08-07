@@ -13,26 +13,53 @@ final class MotionRecorder: ObservableObject {
     @Published var elapsedTime: TimeInterval = 0
     @Published var sampleCount = 0
 
+    @Published var isCountingDown = false
+    @Published var countdownRemaining = 0
+
     @Published var isCalibrating = false
     @Published var calibrationProgress: Double = 0 // 0...1, for a progress bar
 
     private var samples: [MotionSample] = []
     private var startTimestamp: TimeInterval = 0
-    let sampleRateHz: Double = 100.0
+    let sampleRateHz: Double = 100.0 // CoreMotion clamps to the device's actual max if this isn't achievable
 
-    /// Radians subtracted from every raw pitch reading so the calibrated neutral position reads as 0°. Set by calibrate().
+    /// Radians subtracted from every raw pitch reading so the calibrated
+    /// neutral position reads as 0°. Set by calibrate().
     private(set) var calibrationOffset: Double = 0
-    private let calibrationDuration: TimeInterval = 15.0 // well under the 60s ceiling
+    private let calibrationDuration: TimeInterval = 10.0 // well under the 60s ceiling
+    private let startCountdownSeconds = 3 // time to get the hand back on the wheel
 
+    /// Starts a countdown so the person has time to get their hand back onto
+    /// the wheel after tapping Start; actual sampling (and elapsedTime = 0)
+    /// only begins once the countdown finishes.
     func start() {
-        guard motionManager.isDeviceMotionAvailable else {
-            print("Device motion not available on this device")
+        guard motionManager.isDeviceMotionAvailable, !isRecording, !isCountingDown, !isCalibrating else {
             return
         }
         samples.removeAll()
         sampleCount = 0
         elapsedTime = 0
         startTimestamp = 0
+
+        isCountingDown = true
+        countdownRemaining = startCountdownSeconds
+
+        Task { @MainActor in
+            WKInterfaceDevice.current().play(.click) // tick for "3"
+            while self.countdownRemaining > 1 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self.countdownRemaining -= 1
+                WKInterfaceDevice.current().play(.click) // tick for "2", "1"
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+
+            self.isCountingDown = false
+            WKInterfaceDevice.current().play(.start) // distinct buzz: recording has actually begun
+            self.beginSampling()
+        }
+    }
+
+    private func beginSampling() {
         isRecording = true
 
         motionManager.deviceMotionUpdateInterval = 1.0 / sampleRateHz
@@ -76,7 +103,7 @@ final class MotionRecorder: ObservableObject {
     /// Clears the finished session's stopwatch/sample count so the watch
     /// screen is ready for a fresh Start. Does not touch calibrationOffset.
     func reset() {
-        guard !isRecording, !isCalibrating else { return }
+        guard !isRecording, !isCalibrating, !isCountingDown else { return }
         samples.removeAll()
         sampleCount = 0
         elapsedTime = 0
@@ -87,7 +114,7 @@ final class MotionRecorder: ObservableObject {
     /// result as the new zero point. Ask the user to hold their hands at the
     /// wheel's neutral position while this runs. Buzzes the watch on completion.
     func calibrate() {
-        guard motionManager.isDeviceMotionAvailable, !isRecording, !isCalibrating else { return }
+        guard motionManager.isDeviceMotionAvailable, !isRecording, !isCalibrating, !isCountingDown else { return }
         isCalibrating = true
         calibrationProgress = 0
 

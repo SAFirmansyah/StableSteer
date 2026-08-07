@@ -1,18 +1,19 @@
 import SwiftUI
-import Combine
 
 struct ContentView: View {
     @StateObject private var recorder = MotionRecorder()
     @ObservedObject private var connectivity = WatchSessionManager.shared
 
     private enum ScreenState {
-        case idle       // nothing recorded yet, ready to Start or Calibrate
+        case idle          // nothing recorded yet, ready to Start or Calibrate
+        case countingDown  // Start was tapped, waiting for the hand to get back on the wheel
         case recording
-        case stopped    // session finished, waiting for Reset
+        case stopped       // session finished, waiting for Reset
         case calibrating
     }
 
     private var state: ScreenState {
+        if recorder.isCountingDown { return .countingDown }
         if recorder.isCalibrating { return .calibrating }
         if recorder.isRecording { return .recording }
         if recorder.elapsedTime > 0 { return .stopped }
@@ -20,6 +21,29 @@ struct ContentView: View {
     }
 
     var body: some View {
+        Group {
+            if state == .countingDown {
+                countdownView
+            } else {
+                stopwatchView
+            }
+        }
+        .padding()
+    }
+
+    private var countdownView: some View {
+        VStack(spacing: 8) {
+            Text("\(recorder.countdownRemaining)")
+                .font(.system(size: 64, weight: .bold, design: .rounded))
+                .foregroundStyle(.green)
+            Text("Get your hand back on the wheel…")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private var stopwatchView: some View {
         VStack(spacing: 8) {
             Text(timeString(recorder.elapsedTime))
                 .font(.system(.title2, design: .monospaced))
@@ -30,19 +54,22 @@ struct ContentView: View {
 
             switch state {
             case .idle:
-                Button(action: recorder.start) {
+                Button(action: startRecording) {
                     Text("Start")
                         .frame(maxWidth: .infinity)
                 }
                 .tint(.green)
                 .buttonStyle(.borderedProminent)
 
-                Button(action: recorder.calibrate) {
+                Button(action: calibrate) {
                     Text("Calibrate")
                         .frame(maxWidth: .infinity)
                 }
                 .tint(.blue)
                 .buttonStyle(.bordered)
+
+            case .countingDown:
+                EmptyView() // handled by countdownView above
 
             case .recording:
                 Button(action: stopRecording) {
@@ -53,7 +80,7 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
 
             case .stopped:
-                Button(action: recorder.reset) {
+                Button(action: resetSession) {
                     Text("Reset")
                         .frame(maxWidth: .infinity)
                 }
@@ -69,14 +96,31 @@ struct ContentView: View {
                     .multilineTextAlignment(.center)
             }
 
-            if !connectivity.lastTransferStatus.isEmpty {
+            // Only relevant right after a Stop, while a transfer may be in
+            // flight — hidden in every other state so a stale message can't
+            // linger into the next recording or calibration.
+            if state == .stopped, !connectivity.lastTransferStatus.isEmpty {
                 Text(connectivity.lastTransferStatus)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
         }
-        .padding()
+    }
+
+    private func startRecording() {
+        connectivity.lastTransferStatus = ""
+        recorder.start()
+    }
+
+    private func calibrate() {
+        connectivity.lastTransferStatus = ""
+        recorder.calibrate()
+    }
+
+    private func resetSession() {
+        connectivity.lastTransferStatus = ""
+        recorder.reset()
     }
 
     private func stopRecording() {
