@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var recorder = MotionRecorder()
     @ObservedObject private var connectivity = WatchSessionManager.shared
+    @ObservedObject private var circuitSettings = CircuitSettings.shared
 
     private enum ScreenState {
         case idle          // nothing recorded yet, ready to Start or Calibrate
@@ -20,15 +21,34 @@ struct ContentView: View {
         return .idle
     }
 
+    /// Only safe to change circuit when nothing is actively happening —
+    /// switching mid-recording would be confusing.
+    private var canChangeCircuit: Bool {
+        state == .idle || state == .stopped
+    }
+
     var body: some View {
-        Group {
-            if state == .countingDown {
-                countdownView
-            } else {
-                stopwatchView
+        NavigationStack {
+            Group {
+                if state == .countingDown {
+                    countdownView
+                } else {
+                    stopwatchView
+                }
+            }
+            .padding()
+            .navigationTitle(circuitSettings.selectedCircuit.rawValue)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        CircuitSettingsView()
+                    } label: {
+                        Image(systemName: "flag.checkered")
+                    }
+                    .disabled(!canChangeCircuit)
+                }
             }
         }
-        .padding()
     }
 
     private var countdownView: some View {
@@ -125,7 +145,7 @@ struct ContentView: View {
 
     private func stopRecording() {
         let name = "Session \(Date().formatted(date: .abbreviated, time: .shortened))"
-        let session = recorder.stop(named: name)
+        let session = recorder.stop(named: name, circuit: circuitSettings.selectedCircuit)
         connectivity.send(session)
     }
 

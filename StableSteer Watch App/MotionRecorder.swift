@@ -5,7 +5,7 @@ import WatchKit
 
 /// Wraps CMMotionManager and turns device-motion updates into MotionSamples.
 /// Runs entirely on the Watch — no phone connection required to record.
-final class MotionRecorder: ObservableObject {
+final class MotionRecorder: NSObject, ObservableObject {
     private let motionManager = CMMotionManager()
     private let queue = OperationQueue()
 
@@ -23,11 +23,23 @@ final class MotionRecorder: ObservableObject {
     private var startTimestamp: TimeInterval = 0
     let sampleRateHz: Double = 100.0 // CoreMotion clamps to the device's actual max if this isn't achievable
 
+    /// Keeps the app (and CoreMotion) alive in the background during a
+    /// recording, so the wrist going still and the screen dimming doesn't
+    /// interrupt sampling. See WorkoutSessionManager for why.
+    private let workoutManager = WorkoutSessionManager()
+
     /// Radians subtracted from every raw pitch reading so the calibrated
     /// neutral position reads as 0°. Set by calibrate().
     private(set) var calibrationOffset: Double = 0
     private let calibrationDuration: TimeInterval = 10.0 // well under the 60s ceiling
     private let startCountdownSeconds = 3 // time to get the hand back on the wheel
+
+    override init() {
+        super.init()
+        // Ask early so the permission sheet is out of the way before the
+        // person ever taps Start.
+        workoutManager.requestAuthorization()
+    }
 
     /// Starts a countdown so the person has time to get their hand back onto
     /// the wheel after tapping Start; actual sampling (and elapsedTime = 0)
@@ -61,6 +73,7 @@ final class MotionRecorder: ObservableObject {
 
     private func beginSampling() {
         isRecording = true
+        workoutManager.start() // keeps sampling alive even with the wrist down / screen off
 
         motionManager.deviceMotionUpdateInterval = 1.0 / sampleRateHz
         queue.qualityOfService = .userInitiated
@@ -88,13 +101,15 @@ final class MotionRecorder: ObservableObject {
 
     /// Stops recording and packages everything captured into a RecordingSession.
     @discardableResult
-    func stop(named name: String) -> RecordingSession {
+    func stop(named name: String, circuit: Circuit) -> RecordingSession {
         motionManager.stopDeviceMotionUpdates()
+        workoutManager.end()
         isRecording = false
         let session = RecordingSession(
             name: name,
             startDate: Date().addingTimeInterval(-elapsedTime),
             sampleRateHz: sampleRateHz,
+            circuitName: circuit.rawValue,
             samples: samples
         )
         return session

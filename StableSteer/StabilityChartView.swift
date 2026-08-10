@@ -2,8 +2,16 @@ import SwiftUI
 import Charts
 
 struct StabilityChartView: View {
-    let session: RecordingSession
+    @State private var session: RecordingSession
     @State private var selectedSample: MotionSample?
+    @State private var isRenaming = false
+    @State private var draftName = ""
+
+    @ObservedObject private var manager = PhoneSessionManager.shared
+
+    init(session: RecordingSession) {
+        _session = State(initialValue: session)
+    }
 
     var body: some View {
         ScrollView {
@@ -86,11 +94,31 @@ struct StabilityChartView: View {
             .padding(.vertical)
         }
         .navigationTitle(session.name)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    draftName = session.name
+                    isRenaming = true
+                } label: {
+                    Image(systemName: "pencil")
+                }
+            }
+        }
+        .alert("Rename Session", isPresented: $isRenaming) {
+            TextField("Session name", text: $draftName)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                session.name = trimmed
+                manager.rename(sessionID: session.id, to: trimmed)
+            }
+        }
     }
 
     /// Converts a drag location on the chart into the nearest recorded sample.
     private func updateSelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        guard let anchor = proxy.plotFrame else { return }
+        guard let anchor = proxy.plotAreaFrame else { return }
         let plotFrame = geometry[anchor]
         guard plotFrame.contains(location) else { return }
 
@@ -119,6 +147,7 @@ struct StabilityChartView: View {
             name: "Preview",
             startDate: Date(),
             sampleRateHz: 50,
+            circuitName: Circuit.monza.rawValue,
             samples: []
         ))
     }

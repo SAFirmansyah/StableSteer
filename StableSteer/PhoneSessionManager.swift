@@ -53,4 +53,12 @@ final class PhoneSessionManager: NSObject, ObservableObject, WCSessionDelegate {
         guard let data = try? Data(contentsOf: storageURL) else { return }
         sessions = (try? JSONDecoder().decode([RecordingSession].self, from: data)) ?? []
     }
+
+    /// Updates a session's freeform name (shown as the chart's navigation
+    /// title) and persists the change.
+    func rename(sessionID: UUID, to newName: String) {
+        guard let index = sessions.firstIndex(where: { $0.id == sessionID }) else { return }
+        sessions[index].name = newName
+        saveToDisk()
+    }
 }

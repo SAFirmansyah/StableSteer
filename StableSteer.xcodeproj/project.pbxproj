@@ -50,6 +50,7 @@
 		F1E0AE3D3022D94100C480D9 /* Exceptions for "Shared" folder in "StableSteer Watch App" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Circuits.swift,
 				MotionSample.swift,
 			);
 			target = F1E0AE0D3022CFFD00C480D9 /* StableSteer Watch App */;

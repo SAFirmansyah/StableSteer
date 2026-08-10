@@ -23,6 +23,8 @@ struct RecordingSession: Codable, Identifiable, Hashable {
     var name: String
     let startDate: Date
     let sampleRateHz: Double
+    /// Raw value of the Circuit selected on the watch when this was recorded.
+    let circuitName: String
     let samples: [MotionSample]
 
     var duration: TimeInterval { samples.last?.elapsedTime ?? 0 }
