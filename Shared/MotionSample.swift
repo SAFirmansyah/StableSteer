@@ -20,7 +20,10 @@ struct MotionSample: Codable, Identifiable, Hashable {
 /// A full recording, ready to be transferred, stored, or charted.
 struct RecordingSession: Codable, Identifiable, Hashable {
     var id = UUID()
-    var name: String
+    /// nil unless the person has explicitly renamed this session on the
+    /// phone; when nil, the app shows an auto-generated "<circuit> Session
+    /// <n>" title instead. See PhoneSessionManager.displayTitle(for:).
+    var customName: String?
     let startDate: Date
     let sampleRateHz: Double
     /// Raw value of the Circuit selected on the watch when this was recorded.

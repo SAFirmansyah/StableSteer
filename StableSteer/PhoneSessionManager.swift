@@ -54,11 +54,29 @@ final class PhoneSessionManager: NSObject, ObservableObject, WCSessionDelegate {
         sessions = (try? JSONDecoder().decode([RecordingSession].self, from: data)) ?? []
     }
 
-    /// Updates a session's freeform name (shown as the chart's navigation
-    /// title) and persists the change.
+    /// Sets a session's custom name. Passing an empty/whitespace-only string
+    /// clears it, reverting the display title back to the auto-generated
+    /// "<circuit> Session <n>" form.
     func rename(sessionID: UUID, to newName: String) {
         guard let index = sessions.firstIndex(where: { $0.id == sessionID }) else { return }
-        sessions[index].name = newName
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        sessions[index].customName = trimmed.isEmpty ? nil : trimmed
         saveToDisk()
+    }
+
+    /// The single source of truth for how a session's title is shown,
+    /// everywhere it's shown: the person's custom name if they've set one,
+    /// otherwise "<circuit> Session <n>", where n is that session's
+    /// chronological position among all sessions on the same circuit
+    /// (1 = first ever recorded there).
+    func displayTitle(for session: RecordingSession) -> String {
+        if let customName = session.customName, !customName.isEmpty {
+            return customName
+        }
+        let sameCircuit = sessions
+            .filter { $0.circuitName == session.circuitName }
+            .sorted { $0.startDate < $1.startDate }
+        let number = (sameCircuit.firstIndex(where: { $0.id == session.id }) ?? 0) + 1
+        return "\(session.circuitName) Session \(number)"
     }
 }

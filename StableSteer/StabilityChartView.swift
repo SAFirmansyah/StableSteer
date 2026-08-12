@@ -93,11 +93,11 @@ struct StabilityChartView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle(session.name)
+        .navigationTitle(manager.displayTitle(for: session))
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
-                    draftName = session.name
+                    draftName = session.customName ?? ""
                     isRenaming = true
                 } label: {
                     Image(systemName: "pencil")
@@ -107,12 +107,19 @@ struct StabilityChartView: View {
         .alert("Rename Session", isPresented: $isRenaming) {
             TextField("Session name", text: $draftName)
             Button("Cancel", role: .cancel) {}
+            if session.customName != nil {
+                Button("Reset to Automatic", role: .destructive) {
+                    session.customName = nil
+                    manager.rename(sessionID: session.id, to: "")
+                }
+            }
             Button("Save") {
                 let trimmed = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmed.isEmpty else { return }
-                session.name = trimmed
+                session.customName = trimmed.isEmpty ? nil : trimmed
                 manager.rename(sessionID: session.id, to: trimmed)
             }
+        } message: {
+            Text("Leave blank to use the automatic \"circuit + number\" title.")
         }
     }
 
@@ -144,7 +151,6 @@ struct StabilityChartView: View {
 #Preview {
     NavigationStack {
         StabilityChartView(session: RecordingSession(
-            name: "Preview",
             startDate: Date(),
             sampleRateHz: 50,
             circuitName: Circuit.monza.rawValue,

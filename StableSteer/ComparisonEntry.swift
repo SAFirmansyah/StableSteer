@@ -1,11 +1,3 @@
-//
-//  ComparisonEntry.swift
-//  StableSteer
-//
-//  Created by Satria Adi Firmansyah on 12/08/26.
-//
-
-
 import SwiftUI
 import Charts
 
@@ -28,34 +20,32 @@ struct CompareChartView: View {
     private let colorA = Color.blue
     private let colorB = Color.orange
 
+    /// Shared Y range across both charts so a swing looks the same size
+    /// visually in both — otherwise each chart auto-scaling independently
+    /// could make a small wobble in one look as big as a huge swing in the
+    /// other just because of axis scaling.
+    private var sharedYDomain: ClosedRange<Double> {
+        let allValues = (pair.first.session.samples + pair.second.session.samples).map { $0.attitudeXDegrees }
+        guard let minValue = allValues.min(), let maxValue = allValues.max(), minValue < maxValue else {
+            return -10...10
+        }
+        let padding = (maxValue - minValue) * 0.1
+        return (minValue - padding)...(maxValue + padding)
+    }
+
+    /// Shared X range (0 to the longer session's duration) so both charts
+    /// line up on the same time scale, making it easy to compare the same
+    /// moment across sessions.
+    private var sharedXDomain: ClosedRange<Double> {
+        let maxDuration = max(pair.first.session.duration, pair.second.session.duration)
+        return 0...max(maxDuration, 1)
+    }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                legend
-
-                Chart {
-                    ForEach(pair.first.session.samples) { sample in
-                        LineMark(
-                            x: .value("Time (s)", sample.elapsedTime),
-                            y: .value("Attitude X", sample.attitudeXDegrees)
-                        )
-                        .foregroundStyle(colorA)
-                        .interpolationMethod(.monotone)
-                    }
-                    ForEach(pair.second.session.samples) { sample in
-                        LineMark(
-                            x: .value("Time (s)", sample.elapsedTime),
-                            y: .value("Attitude X", sample.attitudeXDegrees)
-                        )
-                        .foregroundStyle(colorB)
-                        .interpolationMethod(.monotone)
-                    }
-                }
-                .chartXAxisLabel("Time elapsed (s)")
-                .chartYAxisLabel("Hand position (°)")
-                .frame(height: 280)
-                .padding(.horizontal)
-
+            VStack(alignment: .leading, spacing: 20) {
+                chartPanel(entry: pair.first, color: colorA)
+                chartPanel(entry: pair.second, color: colorB)
                 statsComparison
             }
             .padding(.vertical)
@@ -63,10 +53,23 @@ struct CompareChartView: View {
         .navigationTitle("Compare")
     }
 
-    private var legend: some View {
-        HStack(spacing: 16) {
-            legendItem(color: colorA, label: pair.first.label)
-            legendItem(color: colorB, label: pair.second.label)
+    private func chartPanel(entry: ComparisonEntry, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            legendItem(color: color, label: entry.label)
+
+            Chart(entry.session.samples) { sample in
+                LineMark(
+                    x: .value("Time (s)", sample.elapsedTime),
+                    y: .value("Attitude X", sample.attitudeXDegrees)
+                )
+                .foregroundStyle(color)
+                .interpolationMethod(.monotone)
+            }
+            .chartXScale(domain: sharedXDomain)
+            .chartYScale(domain: sharedYDomain)
+            .chartXAxisLabel("Time elapsed (s)")
+            .chartYAxisLabel("Hand position (°)")
+            .frame(height: 180)
         }
         .padding(.horizontal)
     }
@@ -75,7 +78,7 @@ struct CompareChartView: View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 10, height: 10)
             Text(label)
-                .font(.caption)
+                .font(.subheadline.bold())
                 .lineLimit(1)
         }
     }
@@ -136,11 +139,11 @@ struct CompareChartView: View {
         CompareChartView(pair: ComparisonPair(
             first: ComparisonEntry(
                 label: "Monza Session 1",
-                session: RecordingSession(name: "A", startDate: Date(), sampleRateHz: 50, circuitName: "Monza", samples: [])
+                session: RecordingSession(startDate: Date(), sampleRateHz: 50, circuitName: "Monza", samples: [])
             ),
             second: ComparisonEntry(
                 label: "Monza Session 2",
-                session: RecordingSession(name: "B", startDate: Date(), sampleRateHz: 50, circuitName: "Monza", samples: [])
+                session: RecordingSession(startDate: Date(), sampleRateHz: 50, circuitName: "Monza", samples: [])
             )
         ))
     }

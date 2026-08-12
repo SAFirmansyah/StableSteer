@@ -87,8 +87,7 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .tint(.blue)
-                .foregroundStyle(Color(.white))
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
 
             case .countingDown:
                 EmptyView() // handled by countdownView above
@@ -146,8 +145,7 @@ struct ContentView: View {
     }
 
     private func stopRecording() {
-        let name = "Session \(Date().formatted(date: .abbreviated, time: .shortened))"
-        let session = recorder.stop(named: name, circuit: circuitSettings.selectedCircuit)
+        let session = recorder.stop(circuit: circuitSettings.selectedCircuit)
         connectivity.send(session)
     }
 

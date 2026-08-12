@@ -102,17 +102,7 @@ struct SessionListView: View {
     }
 
     private func title(for session: RecordingSession) -> String {
-        "\(session.circuitName) Session \(sessionNumber(for: session))"
-    }
-
-    /// This session's position among all sessions recorded on the same
-    /// circuit, ordered chronologically (1 = first ever recorded there),
-    /// independent of how the list itself is sorted for display.
-    private func sessionNumber(for session: RecordingSession) -> Int {
-        let sameCircuit = manager.sessions
-            .filter { $0.circuitName == session.circuitName }
-            .sorted { $0.startDate < $1.startDate }
-        return (sameCircuit.firstIndex(where: { $0.id == session.id }) ?? 0) + 1
+        manager.displayTitle(for: session)
     }
 
     private func formattedDuration(_ interval: TimeInterval) -> String {

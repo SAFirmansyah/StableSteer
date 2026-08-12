@@ -21,7 +21,7 @@ final class MotionRecorder: NSObject, ObservableObject {
 
     private var samples: [MotionSample] = []
     private var startTimestamp: TimeInterval = 0
-    let sampleRateHz: Double = 100.0 // CoreMotion clamps to the device's actual max if this isn't achievable
+    let sampleRateHz: Double = 50.0 // CoreMotion clamps to the device's actual max if this isn't achievable
 
     /// Keeps the app (and CoreMotion) alive in the background during a
     /// recording, so the wrist going still and the screen dimming doesn't
@@ -101,12 +101,11 @@ final class MotionRecorder: NSObject, ObservableObject {
 
     /// Stops recording and packages everything captured into a RecordingSession.
     @discardableResult
-    func stop(named name: String, circuit: Circuit) -> RecordingSession {
+    func stop(circuit: Circuit) -> RecordingSession {
         motionManager.stopDeviceMotionUpdates()
         workoutManager.end()
         isRecording = false
         let session = RecordingSession(
-            name: name,
             startDate: Date().addingTimeInterval(-elapsedTime),
             sampleRateHz: sampleRateHz,
             circuitName: circuit.rawValue,
