@@ -118,7 +118,7 @@ struct StabilityChartView: View {
 
     /// Converts a drag location on the chart into the nearest recorded sample.
     private func updateSelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
-        guard let anchor = proxy.plotAreaFrame else { return }
+        guard let anchor = proxy.plotFrame else { return }
         let plotFrame = geometry[anchor]
         guard plotFrame.contains(location) else { return }
 

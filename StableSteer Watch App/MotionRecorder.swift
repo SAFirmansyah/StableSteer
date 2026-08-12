@@ -132,6 +132,7 @@ final class MotionRecorder: NSObject, ObservableObject {
         guard motionManager.isDeviceMotionAvailable, !isRecording, !isCalibrating, !isCountingDown else { return }
         isCalibrating = true
         calibrationProgress = 0
+        workoutManager.start() // keeps sampling alive even with the wrist down / screen off
 
         var pitchSamples: [Double] = []
         let calibrationStart = Date()
@@ -151,6 +152,7 @@ final class MotionRecorder: NSObject, ObservableObject {
             guard elapsed >= self.calibrationDuration else { return }
 
             self.motionManager.stopDeviceMotionUpdates()
+            self.workoutManager.end()
             let average = pitchSamples.reduce(0, +) / Double(pitchSamples.count)
 
             DispatchQueue.main.async {
