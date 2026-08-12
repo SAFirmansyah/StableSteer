@@ -4,5 +4,9 @@
 <dict>
 	<key>NSMotionUsageDescription</key>
 	<string>Record hand stability</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Record hand stability while driving</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Record hand stability while calibrating</string>
 </dict>
 </plist>

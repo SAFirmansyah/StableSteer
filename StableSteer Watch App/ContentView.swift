@@ -37,6 +37,7 @@ struct ContentView: View {
                 }
             }
             .padding()
+            .padding(.top, 12)
             .navigationTitle(circuitSettings.selectedCircuit.rawValue)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -86,7 +87,8 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .tint(.blue)
-                .buttonStyle(.bordered)
+                .foregroundStyle(Color(.white))
+                .buttonStyle(.borderedProminent)
 
             case .countingDown:
                 EmptyView() // handled by countdownView above
